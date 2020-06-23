@@ -2,22 +2,26 @@ package alf
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 )
 
-// Run parses the flags and executes the command. Invoke this from main.
-func Run(ctx context.Context) error {
-	flag.Parse()
-	_Args.PositionalArgs = flag.Args()
+// Root is your main, top-level command. Use your program's init function to set
+// up its description, flags and subcommands.
+type Root struct{ *Delegator }
+
+// Run parses the top-level flags, extracts the positional arguments and
+// executes the command. Invoke this from main.
+func (r *Root) Run(ctx context.Context, args []string) error {
+	r.Flags.Parse(args)
+	posArgs := r.Flags.Args()
 	var deleg Directive
-	err := _MainCommand.Perform(ctx, &_Args)
-	if _MainCommand.Selected == nil {
+	err := r.Perform(ctx, posArgs)
+	if r.Selected == nil {
 		// either asked for help or asked for unknown command.
-		flag.Usage()
+		r.Flags.Usage()
 	} else {
-		deleg = _MainCommand.Selected
+		deleg = r.Selected
 	}
 	if err != nil {
 		return err
@@ -49,8 +53,6 @@ var (
 	_Args Arguments
 	// _Bin is the name of the binary file.
 	_Bin = os.Args[0]
-	// _MainCommand is the parent command for subcommands and their children.
-	_MainCommand *Delegator
 )
 
 // Directive is an abstraction for a parent or child command. A parent would
