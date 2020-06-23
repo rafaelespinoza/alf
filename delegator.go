@@ -26,17 +26,17 @@ type Delegator struct {
 func (d *Delegator) Summary() string { return d.Description }
 
 // Perform chooses a subcommand.
-func (d *Delegator) Perform(ctx context.Context, a *Arguments) error {
-	if len(a.PositionalArgs) < 1 {
+func (d *Delegator) Perform(ctx context.Context, positionalArgs []string) error {
+	if len(positionalArgs) < 1 {
 		return flag.ErrHelp
 	}
 	var err error
-	switch a.PositionalArgs[0] {
+	switch positionalArgs[0] {
 	case "-h", "-help", "--help", "help":
 		err = flag.ErrHelp
 	default:
-		if cmd, ok := d.Subs[a.PositionalArgs[0]]; !ok {
-			err = fmt.Errorf("unknown command %q", a.PositionalArgs[0])
+		if cmd, ok := d.Subs[positionalArgs[0]]; !ok {
+			err = fmt.Errorf("unknown command %q", positionalArgs[0])
 		} else {
 			d.Selected = cmd
 		}
@@ -47,9 +47,9 @@ func (d *Delegator) Perform(ctx context.Context, a *Arguments) error {
 
 	switch selected := d.Selected.(type) {
 	case *Command:
-		err = selected.Setup(a).Parse(a.PositionalArgs[1:])
+		err = selected.Setup(positionalArgs).Parse(positionalArgs[1:])
 	case *Delegator:
-		a.PositionalArgs = a.PositionalArgs[1:] // I, also like to live dangerously
+		positionalArgs = positionalArgs[1:] // I, also like to live dangerously
 	default:
 		err = fmt.Errorf("unsupported value of type %T", selected)
 	}

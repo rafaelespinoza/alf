@@ -3,7 +3,6 @@ package alf
 import (
 	"context"
 	"fmt"
-	"os"
 )
 
 // Root is your main, top-level command. Use your program's init function to set
@@ -28,18 +27,18 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	}
 
 	if _, ok := deleg.(*Command); ok {
-		return deleg.Perform(ctx, &_Args)
+		return deleg.Perform(ctx, posArgs)
 	}
 
 	topic := deleg.(*Delegator)
-	if err = topic.Perform(ctx, &_Args); err != nil {
+	if err = topic.Perform(ctx, posArgs); err != nil {
 		topic.Flags.Usage()
 		return err
 	}
 
 	switch subcmd := topic.Selected.(type) {
 	case *Command:
-		err = subcmd.Perform(ctx, &_Args)
+		err = subcmd.Perform(ctx, posArgs)
 	case *Delegator:
 		err = fmt.Errorf("too much delegation, selected should be a %T", &Command{})
 	default:
@@ -48,22 +47,11 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	return err
 }
 
-var (
-	// _Args is a shared top-level arguments value.
-	_Args Arguments
-	// _Bin is the name of the binary file.
-	_Bin = os.Args[0]
-)
-
 // Directive is an abstraction for a parent or child command. A parent would
 // delegate to a subcommand, while a subcommand does the actual task.
 type Directive interface {
 	// Summary provides a short, one-line description.
 	Summary() string
 	// Perform should either choose a subcommand or do a task.
-	Perform(ctx context.Context, a *Arguments) error
-}
-
-type Arguments struct {
-	PositionalArgs []string
+	Perform(ctx context.Context, positionalArgs []string) error
 }
