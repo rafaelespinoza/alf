@@ -15,7 +15,7 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	r.Flags.Parse(args)
 	posArgs := r.Flags.Args()
 	var deleg Directive
-	err := r.Perform(ctx, posArgs)
+	err := r.Perform(ctx, &posArgs)
 	if r.Selected == nil {
 		// either asked for help or asked for unknown command.
 		r.Flags.Usage()
@@ -27,18 +27,18 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	}
 
 	if _, ok := deleg.(*Command); ok {
-		return deleg.Perform(ctx, posArgs)
+		return deleg.Perform(ctx, &posArgs)
 	}
 
 	topic := deleg.(*Delegator)
-	if err = topic.Perform(ctx, posArgs); err != nil {
+	if err = topic.Perform(ctx, &posArgs); err != nil {
 		topic.Flags.Usage()
 		return err
 	}
 
 	switch subcmd := topic.Selected.(type) {
 	case *Command:
-		err = subcmd.Perform(ctx, posArgs)
+		err = subcmd.Perform(ctx, &posArgs)
 	case *Delegator:
 		err = fmt.Errorf("too much delegation, selected should be a %T", &Command{})
 	default:
@@ -53,5 +53,5 @@ type Directive interface {
 	// Summary provides a short, one-line description.
 	Summary() string
 	// Perform should either choose a subcommand or do a task.
-	Perform(ctx context.Context, positionalArgs []string) error
+	Perform(ctx context.Context, positionalArgs *[]string) error
 }

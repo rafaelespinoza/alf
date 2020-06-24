@@ -26,17 +26,19 @@ type Delegator struct {
 func (d *Delegator) Summary() string { return d.Description }
 
 // Perform chooses a subcommand.
-func (d *Delegator) Perform(ctx context.Context, positionalArgs []string) error {
-	if len(positionalArgs) < 1 {
+func (d *Delegator) Perform(ctx context.Context, pargs *[]string) error {
+	if pargs == nil || len(*pargs) < 1 {
 		return flag.ErrHelp
 	}
+	positionalArgs := *pargs
+
 	var err error
-	switch positionalArgs[0] {
+	switch first := positionalArgs[0]; first {
 	case "-h", "-help", "--help", "help":
 		err = flag.ErrHelp
 	default:
-		if cmd, ok := d.Subs[positionalArgs[0]]; !ok {
-			err = fmt.Errorf("unknown command %q", positionalArgs[0])
+		if cmd, ok := d.Subs[first]; !ok {
+			err = fmt.Errorf("unknown command %q", first)
 		} else {
 			d.Selected = cmd
 		}
@@ -49,7 +51,10 @@ func (d *Delegator) Perform(ctx context.Context, positionalArgs []string) error 
 	case *Command:
 		err = selected.Setup(positionalArgs).Parse(positionalArgs[1:])
 	case *Delegator:
-		positionalArgs = positionalArgs[1:] // I, also like to live dangerously
+		// Delegating to another delegator (for example: from the root command
+		// to a subcommand), wouldn't work if pargs was a []string (a "value").
+		// So we're using a *[]string (a "pointer") instead.
+		*pargs = positionalArgs[1:]
 	default:
 		err = fmt.Errorf("unsupported value of type %T", selected)
 	}

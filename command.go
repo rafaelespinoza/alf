@@ -21,4 +21,4 @@ type Command struct {
 func (c *Command) Summary() string { return c.Description }
 
 // Perform calls Run to execute the task at hand.
-func (c *Command) Perform(ctx context.Context, args []string) error { return c.Run(ctx, args) }
+func (c *Command) Perform(ctx context.Context, args *[]string) error { return c.Run(ctx, *args) }
