@@ -5,7 +5,7 @@ import (
 	"flag"
 )
 
-// A Command performs a task.
+// A Command performs a task. A parent Delegator passes control to one of these.
 type Command struct {
 	// Description should provide a short summary.
 	Description string

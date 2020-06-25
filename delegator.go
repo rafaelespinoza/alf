@@ -17,8 +17,10 @@ type Delegator struct {
 	Flags *flag.FlagSet
 	// Selected is the chosen transfer point of control.
 	Selected Directive
-	// Subs associates a name with a link to another directive. NOTE: one does
-	// not simply create too many layers of delegators.
+	// Subs associates a name with another Directive. It's probably best to not
+	// create too deep of a hierarchy of Delegators pointing to Delegators. An
+	// exception to this recommendation is a Root command with some Delegators
+	// as direct childen, which in turn have just one more level of subcommands.
 	Subs map[string]Directive
 }
 

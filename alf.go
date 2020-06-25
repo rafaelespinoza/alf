@@ -1,3 +1,7 @@
+// Package alf is a small, no-frills toolset for creating simple command line
+// applications. It's a thin wrapper around the standard library's flag package
+// with some stuff to make composition and documentation generation easier. See
+// the examples directory for demo usage.
 package alf
 
 import (
