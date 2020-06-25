@@ -9,9 +9,12 @@ import (
 type Command struct {
 	// Description should provide a short summary.
 	Description string
-	// Setup should prepare Args for interpretation by using the pointer to Args
-	// with the returned flag set.
-	Setup func(a []string) *flag.FlagSet
+	// Setup is passed the parent flag set and returns a flag set. Call the
+	// (*flag.FlagSet).Init method to reuse the parent flags and modify it as
+	// needed. You could also just allow the input flagset to pass through. If
+	// you don't want to share any flag data between parent and child, then
+	// create a new flag set.
+	Setup func(parentFlags flag.FlagSet) *flag.FlagSet
 	// Run is a wrapper function that selects the necessary command line inputs,
 	// executes the command and returns any errors.
 	Run func(ctx context.Context, args []string) error

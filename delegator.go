@@ -51,7 +51,7 @@ func (d *Delegator) Perform(ctx context.Context, pargs *[]string) error {
 
 	switch selected := d.Selected.(type) {
 	case *Command:
-		err = selected.Setup(positionalArgs).Parse(positionalArgs[1:])
+		err = selected.Setup(*d.Flags).Parse(positionalArgs[1:])
 	case *Delegator:
 		// Delegating to another delegator (for example: from the root command
 		// to a subcommand), wouldn't work if pargs was a []string (a "value").

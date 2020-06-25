@@ -14,9 +14,11 @@ type FooArgs struct {
 	Echo  string
 }
 
+// Direct children of the root command don't need to delegate to child commands.
+// They could also be commands themselves.
 var _Foo = &alf.Command{
 	Description: "a terminal task",
-	Setup: func(posArgs []string) *flag.FlagSet {
+	Setup: func(inFlags flag.FlagSet) *flag.FlagSet {
 		name := _Bin + " foo"
 		flags := flag.NewFlagSet(name, flag.ExitOnError)
 		var fooArgs FooArgs
