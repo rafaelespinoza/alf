@@ -38,7 +38,7 @@ Description:
 		_Args.Foo = &fooArgs
 		return flags
 	},
-	Run: func(ctx context.Context, posArgs []string) error {
+	Run: func(ctx context.Context) error {
 		args := _Args.Foo
 		for i := 0; i < args.Delta; i++ {
 			fmt.Println(args.Echo)

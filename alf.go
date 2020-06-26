@@ -9,17 +9,18 @@ import (
 	"fmt"
 )
 
-// Root is your main, top-level command. Use your program's init function to set
-// up its description, flags and subcommands.
+// Root is your main, top-level command.
 type Root struct{ *Delegator }
 
 // Run parses the top-level flags, extracts the positional arguments and
 // executes the command. Invoke this from main.
 func (r *Root) Run(ctx context.Context, args []string) error {
-	r.Flags.Parse(args)
-	posArgs := r.Flags.Args()
+	if err := r.Flags.Parse(args); err != nil {
+		return err
+	}
+	r.positionalArgs = args
 	var deleg Directive
-	err := r.Perform(ctx, &posArgs)
+	err := r.Perform(ctx)
 	if r.Selected == nil {
 		// either asked for help or asked for unknown command.
 		r.Flags.Usage()
@@ -31,18 +32,18 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	}
 
 	if _, ok := deleg.(*Command); ok {
-		return deleg.Perform(ctx, &posArgs)
+		return deleg.Perform(ctx)
 	}
 
 	topic := deleg.(*Delegator)
-	if err = topic.Perform(ctx, &posArgs); err != nil {
+	if err = topic.Perform(ctx); err != nil {
 		topic.Flags.Usage()
 		return err
 	}
 
 	switch subcmd := topic.Selected.(type) {
 	case *Command:
-		err = subcmd.Perform(ctx, &posArgs)
+		err = subcmd.Perform(ctx)
 	case *Delegator:
 		err = fmt.Errorf("too much delegation, selected should be a %T", &Command{})
 	default:
@@ -57,5 +58,5 @@ type Directive interface {
 	// Summary provides a short, one-line description.
 	Summary() string
 	// Perform should either choose a subcommand or do a task.
-	Perform(ctx context.Context, positionalArgs *[]string) error
+	Perform(ctx context.Context) error
 }

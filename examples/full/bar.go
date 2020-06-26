@@ -80,7 +80,7 @@ Description:
 			},
 			// By now, the flags have been parsed and the subcommand is ready to
 			// go. This is also a good place to do input validation.
-			Run: func(ctx context.Context, posArgs []string) error {
+			Run: func(ctx context.Context) error {
 				args := _Args.Bar
 				var cities []string
 				if args.Biff {
@@ -118,7 +118,7 @@ Description:
 				}
 				return &inFlags
 			},
-			Run: func(ctx context.Context, posArgs []string) error {
+			Run: func(ctx context.Context) error {
 				args := _Args.Bar
 				if args.Biff {
 					return fmt.Errorf("sample error, here's a number %d", args.Alpha)

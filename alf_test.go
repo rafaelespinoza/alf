@@ -3,6 +3,7 @@ package alf_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/rafaelespinoza/alf"
 )
+
+var errStub = errors.New("oof")
 
 func newStubRoot(name string) alf.Root {
 	var (
@@ -29,7 +32,7 @@ func newStubRoot(name string) alf.Root {
 					p.BoolVar(&qux, "quebec", true, "qqq")
 					return &p
 				},
-				Run: func(ctx context.Context, args []string) error { return nil },
+				Run: func(ctx context.Context) error { return nil },
 			},
 			"echo": &alf.Command{
 				Description: "ignore input flags",
@@ -38,14 +41,14 @@ func newStubRoot(name string) alf.Root {
 					flags.BoolVar(&qux, "qux", false, "QQQ")
 					return flags
 				},
-				Run: func(ctx context.Context, args []string) error { return nil },
+				Run: func(ctx context.Context) error { return nil },
 			},
 			"foxtrot": &alf.Command{
 				Description: "allow input flags to pass through",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					return &p
 				},
-				Run: func(ctx context.Context, args []string) error { return nil },
+				Run: func(ctx context.Context) error { return nil },
 			},
 		},
 	}
@@ -60,18 +63,14 @@ func newStubRoot(name string) alf.Root {
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					return newMutedFlagSet("alpha", flag.ContinueOnError)
 				},
-				Run: func(ctx context.Context, args []string) error {
-					return nil
-				},
+				Run: func(ctx context.Context) error { return nil },
 			},
 			"bravo": &alf.Command{
 				Description: "error command",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					return newMutedFlagSet("bravo", flag.ContinueOnError)
 				},
-				Run: func(ctx context.Context, args []string) error {
-					return fmt.Errorf("stub error %v", args)
-				},
+				Run: func(ctx context.Context) error { return errStub },
 			},
 			"charlie": &charlie,
 		},
@@ -101,6 +100,7 @@ func TestRoot(t *testing.T) {
 		{args: []string{"alpha"}, expErr: false},
 		{args: []string{"bravo"}, expErr: true},
 		{args: []string{"charlie"}, expErr: true},
+		{args: []string{"charlie", "-h"}, expErr: true},
 		{args: []string{"charlie", "delta"}, expErr: false},
 		{args: []string{"charlie", "echo"}, expErr: false},
 		{args: []string{"charlie", "foxtrot"}, expErr: false},
@@ -204,13 +204,13 @@ func TestDelegator(t *testing.T) {
 func TestCommand(t *testing.T) {
 	root := newStubRoot(t.Name())
 
-	alpha := root.Subs["alpha"].Perform(context.TODO(), &[]string{})
+	alpha := root.Subs["alpha"].Perform(context.TODO())
 	if alpha != nil {
-		t.Errorf("should return result of Run, unexpected error %v", alpha)
+		t.Errorf("should return result of Run; got %v, expected %v", alpha, nil)
 	}
 
-	bravo := root.Subs["bravo"].Perform(context.TODO(), &[]string{})
-	if bravo == nil {
-		t.Error("should return result of Run, expected error got none")
+	bravo := root.Subs["bravo"].Perform(context.TODO())
+	if bravo != errStub {
+		t.Errorf("should return result of Run; got %v, expected %v", bravo, errStub)
 	}
 }
