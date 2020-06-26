@@ -11,40 +11,39 @@ import (
 	"github.com/rafaelespinoza/alf"
 )
 
-// Arguments or any other struct is a decent way to define, control, document
-// command-line args for your application.
-type Arguments struct {
-	Foo *FooArgs
-	Bar *BarArgs
-}
-
 var (
-	// _Args is the top-level set of named arguments.
-	_Args Arguments
-	// _Bin is the name of the binary file.
+	// Root is the parent command for subcommands and their children.
+	Root *alf.Root
+
+	// _Bin is the name of the binary file. It's for usage functions.
 	_Bin = os.Args[0]
-	// _Root is the parent command for subcommands and their children.
-	_Root *alf.Root
 )
 
 func init() {
+	const pkg = "github.com/rafaelespinoza/alf"
+
+	// The entry point is just a Delegator that gets embedded in a Root.
 	del := &alf.Delegator{
-		Description: "demo github.com/rafaelespinoza/alf",
+		Description: "demo " + pkg,
+		// Associate with subcommands. A Directive could be a something that
+		// performs a task (a Command) or something that passes control to its
+		// own subcommands (a Delegator).
 		Subs: map[string]alf.Directive{
-			"foo": _Foo,
-			"bar": _Bar,
+			"foo": Foo,
+			"bar": Bar,
 		},
-		Flags: flag.CommandLine,
+		// Build a plain old flag set from the standard library.
+		Flags: flag.NewFlagSet("root", flag.ExitOnError),
 	}
 
+	// Add a help message.
 	del.Flags.Usage = func() {
-		descriptions := _Root.DescribeSubcommands()
-		fmt.Fprintf(_Root.Flags.Output(), `Usage:
+		fmt.Fprintf(del.Flags.Output(), `Usage:
 	%s [flags] subcommand [subflags]
 
 Description:
 
-	%s is a tool for showing manpages on your system.
+	%s is a demo of %s.
 
 Subcommands:
 
@@ -52,11 +51,15 @@ Subcommands:
 
 Examples:
 
-	%s [subcommand] -h
-`, _Bin, _Bin, strings.Join(descriptions, "\n\t"), _Bin)
+	%s [subcommand] -h`,
+			_Bin, _Bin, pkg, strings.Join(Root.DescribeSubcommands(), "\n\t"), _Bin)
+
+		fmt.Printf("\n\nFlags:\n\n")
+		del.Flags.PrintDefaults()
 	}
 
-	_Root = &alf.Root{Delegator: del}
+	// The root command directs you to other delegators and commands.
+	Root = &alf.Root{del}
 }
 
 func main() {
@@ -66,7 +69,7 @@ func main() {
 	// NOTE: when passing positional arguments, be sure to reslice it from
 	// [1:]. At this point, os.Args[0] is the binary itself. Omit this value
 	// when starting your application.
-	if err := _Root.Run(context.Background(), os.Args[1:]); err != nil {
+	if err := Root.Run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

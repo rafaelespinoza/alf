@@ -10,20 +10,22 @@ import (
 	"github.com/rafaelespinoza/alf"
 )
 
-// BarArgs is named args for the "bar" command.
-type BarArgs struct {
-	Alpha   int
-	Biff    bool
-	Charlie string
-}
-
+// Bar is an example Delegator that is a direct child of the root. A Delegator
+// will have subcommands of its own and its only job is to hand off control to a
+// child command so it can perform a task.
+//
 // A recommended way to define a command with subcommands (a Delegator) is to
-// create a function and invoke it right away. This allows you to share data
-// between the parent and child within the function scope. The input param,
-// cmdname can be used for generating documentation.
-var _Bar = func(cmdname string) alf.Directive {
+// initialize it within a function. This allows you to share data between the
+// parent and child within the function scope.
+var Bar = func(cmdname string) alf.Directive {
+	// barArgs is named args for the "bar" command.
+	var barArgs struct {
+		Alpha   int
+		Biff    bool
+		Charlie string
+	}
+
 	del := &alf.Delegator{Description: "example delegator with subcommands"}
-	var barArgs BarArgs
 
 	// define flags for this parent command.
 	parentFlags := flag.NewFlagSet(cmdname, flag.ExitOnError)
@@ -73,17 +75,13 @@ Description:
 					fmt.Printf("\n\nFlags:\n\n")
 					inFlags.PrintDefaults()
 				}
-				// Remember to assign this, or else Run won't be able to know
-				// what's been collected here.
-				_Args.Bar = &barArgs
 				return &inFlags
 			},
 			// By now, the flags have been parsed and the subcommand is ready to
 			// go. This is also a good place to do input validation.
 			Run: func(ctx context.Context) error {
-				args := _Args.Bar
 				var cities []string
-				if args.Biff {
+				if barArgs.Biff {
 					cities = []string{"Hill Valley, CA"}
 				} else {
 					cities = []string{
@@ -95,7 +93,7 @@ Description:
 				}
 				ind := time.Now().Second() % len(cities)
 				fmt.Printf("city: %q\n", cities[ind])
-				fmt.Printf("your alternative charlie %q\n", args.Charlie)
+				fmt.Printf("your alternative charlie %q\n", barArgs.Charlie)
 				return nil
 			},
 		},
@@ -119,16 +117,14 @@ Description:
 				return &inFlags
 			},
 			Run: func(ctx context.Context) error {
-				args := _Args.Bar
-				if args.Biff {
-					return fmt.Errorf("sample error, here's a number %d", args.Alpha)
+				if barArgs.Biff {
+					return fmt.Errorf("sample error, here's a number %d", barArgs.Alpha)
 				}
-				fmt.Printf("your alternative charlie %q\n", args.Charlie)
+				fmt.Printf("your alternative charlie %q\n", barArgs.Charlie)
 				return nil
 			},
 		},
 	}
 
-	_Args.Bar = &barArgs
 	return del
 }("bar")
