@@ -6,48 +6,47 @@ package alf
 
 import (
 	"context"
-	"fmt"
+	"errors"
 )
 
 // Root is your main, top-level command.
 type Root struct{ *Delegator }
 
 // Run parses the top-level flags, extracts the positional arguments and
-// executes the command. Invoke this from main.
+// executes the command. Invoke this from main with args as os.Args[1:].
 func (r *Root) Run(ctx context.Context, args []string) error {
 	if err := r.Flags.Parse(args); err != nil {
 		return err
 	}
 	r.positionalArgs = args
-	var deleg Directive
+	var directive Directive
 	err := r.Perform(ctx)
 	if r.Selected == nil {
 		// either asked for help or asked for unknown command.
 		r.Flags.Usage()
 	} else {
-		deleg = r.Selected
+		directive = r.Selected
 	}
 	if err != nil {
 		return err
 	}
 
-	if _, ok := deleg.(*Command); ok {
-		return deleg.Perform(ctx)
+	if _, ok := directive.(*Command); ok {
+		return directive.Perform(ctx)
 	}
 
-	topic := deleg.(*Delegator)
-	if err = topic.Perform(ctx); err != nil {
-		topic.Flags.Usage()
+	delegator := directive.(*Delegator)
+	if err = delegator.Perform(ctx); err != nil {
+		delegator.Flags.Usage()
 		return err
 	}
 
-	switch subcmd := topic.Selected.(type) {
-	case *Command:
+	subcmd, ok := delegator.Selected.(*Command)
+	if !ok {
+		// yeah, let's try not to create too deep of a command hierarchy.
+		err = errors.New("one does not simply create too many layers of delegators")
+	} else {
 		err = subcmd.Perform(ctx)
-	case *Delegator:
-		err = fmt.Errorf("too much delegation, selected should be a %T", &Command{})
-	default:
-		err = fmt.Errorf("unhandled type %T", subcmd)
 	}
 	return err
 }
