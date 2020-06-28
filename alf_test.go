@@ -91,29 +91,60 @@ func newMutedFlagSet(name string, exit flag.ErrorHandling) *flag.FlagSet {
 
 func TestRoot(t *testing.T) {
 	tests := []struct {
-		args   []string
-		expErr bool
+		args       []string
+		prePerform func(context.Context) error
+		expErr     bool
 	}{
+		// Help
 		{args: []string{""}, expErr: true},
 		{args: []string{"-h"}, expErr: true},
 		{args: []string{"--help"}, expErr: true},
+		// Returns whatever the Command returns.
 		{args: []string{"alpha"}, expErr: false},
 		{args: []string{"bravo"}, expErr: true},
+		// Works with flag values on Root's FlagSet.
 		{args: []string{"-foo", "fff", "alpha"}, expErr: false},
+		// Parent flags should be specified before the subcommand.
 		{args: []string{"alpha", "-foo", "fff"}, expErr: true},
+		// Help on a Directive when no flags, args.
 		{args: []string{"charlie"}, expErr: true},
 		{args: []string{"charlie", "-h"}, expErr: true},
+		// Access Directive -> Command.
 		{args: []string{"charlie", "delta"}, expErr: false},
 		{args: []string{"charlie", "echo"}, expErr: false},
 		{args: []string{"charlie", "foxtrot"}, expErr: false},
-		{args: []string{"charlie", "golf"}, expErr: true},
+		// Help on Directive -> Command.
 		{args: []string{"charlie", "delta", "-h"}, expErr: true},
 		{args: []string{"charlie", "echo", "-h"}, expErr: true},
 		{args: []string{"charlie", "foxtrot", "-h"}, expErr: true},
+		// Unknown command.
+		{args: []string{"charlie", "golf"}, expErr: true},
+		// Optional PrePerform field.
+		// This args sequence would normally not have an error.
+		{
+			args:       []string{"alpha"},
+			prePerform: func(ctx context.Context) error { return errStub },
+			expErr:     true,
+		},
+		// This args sequence would normally not have an error.
+		{
+			args:       []string{"charlie", "foxtrot"},
+			prePerform: func(ctx context.Context) error { return errStub },
+			expErr:     true,
+		},
+		// Shouldn't get in the way of parent flags.
+		{
+			args:       []string{"-foo", "fff", "alpha"},
+			prePerform: func(ctx context.Context) error { return nil },
+			expErr:     false,
+		},
 	}
 
 	for i, test := range tests {
 		root := newStubRoot(fmt.Sprintf("%s %d", t.Name(), i))
+		if test.prePerform != nil {
+			root.PrePerform = test.prePerform
+		}
 
 		err := root.Run(context.TODO(), test.args)
 		if err == nil && test.expErr {

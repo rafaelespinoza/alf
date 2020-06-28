@@ -17,6 +17,9 @@ var (
 
 	// _Bin is the name of the binary file. It's for usage functions.
 	_Bin = os.Args[0]
+
+	// _ShowPrePerform helps demo the Root.PrePerform field.
+	_ShowPrePerform bool
 )
 
 func init() {
@@ -35,6 +38,7 @@ func init() {
 		// Build a plain old flag set from the standard library.
 		Flags: flag.NewFlagSet("root", flag.ExitOnError),
 	}
+	del.Flags.BoolVar(&_ShowPrePerform, "pre", false, "if true, log a message in Root.PrePerform")
 
 	// Add a help message.
 	del.Flags.Usage = func() {
@@ -59,7 +63,17 @@ Examples:
 	}
 
 	// The root command directs you to other delegators and commands.
-	Root = &alf.Root{del}
+	Root = &alf.Root{
+		Delegator: del,
+		// This field is an optional function to invoke after the flags have
+		// been parsed, but before choosing a subcommand.
+		PrePerform: func(ctx context.Context) error {
+			if _ShowPrePerform {
+				fmt.Println("called Root.PrePerform")
+			}
+			return nil
+		},
+	}
 }
 
 func main() {

@@ -10,13 +10,24 @@ import (
 )
 
 // Root is your main, top-level command.
-type Root struct{ *Delegator }
+type Root struct {
+	*Delegator
+	// PrePerform is an optional function to invoke during Run, after the flags
+	// have been parsed but before a subcommand is chosen. Run will return early
+	// if this function returns an error.
+	PrePerform func(ctx context.Context) error
+}
 
 // Run parses the top-level flags, extracts the positional arguments and
 // executes the command. Invoke this from main with args as os.Args[1:].
 func (r *Root) Run(ctx context.Context, args []string) error {
 	if err := r.Flags.Parse(args); err != nil {
 		return err
+	}
+	if r.PrePerform != nil {
+		if err := r.PrePerform(ctx); err != nil {
+			return err
+		}
 	}
 	var directive Directive
 	err := r.Perform(ctx)
