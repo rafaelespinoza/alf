@@ -18,7 +18,6 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	if err := r.Flags.Parse(args); err != nil {
 		return err
 	}
-	r.positionalArgs = args
 	var directive Directive
 	err := r.Perform(ctx)
 	if r.Selected == nil {

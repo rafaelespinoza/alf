@@ -99,6 +99,8 @@ func TestRoot(t *testing.T) {
 		{args: []string{"--help"}, expErr: true},
 		{args: []string{"alpha"}, expErr: false},
 		{args: []string{"bravo"}, expErr: true},
+		{args: []string{"-foo", "fff", "alpha"}, expErr: false},
+		{args: []string{"alpha", "-foo", "fff"}, expErr: true},
 		{args: []string{"charlie"}, expErr: true},
 		{args: []string{"charlie", "-h"}, expErr: true},
 		{args: []string{"charlie", "delta"}, expErr: false},

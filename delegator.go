@@ -22,8 +22,6 @@ type Delegator struct {
 	// exception to this recommendation is a Root command with some Delegators
 	// as direct childen, which in turn have just one more level of subcommands.
 	Subs map[string]Directive
-
-	positionalArgs []string
 }
 
 // Summary provides a short, one-line description.
@@ -31,12 +29,13 @@ func (d *Delegator) Summary() string { return d.Description }
 
 // Perform chooses a subcommand.
 func (d *Delegator) Perform(ctx context.Context) error {
-	if len(d.positionalArgs) < 1 {
+	args := d.Flags.Args()
+	if len(args) < 1 {
 		return flag.ErrHelp
 	}
 
 	var err error
-	switch first := d.positionalArgs[0]; first {
+	switch first := args[0]; first {
 	case "-h", "-help", "--help", "help":
 		err = flag.ErrHelp
 	default:
@@ -52,9 +51,9 @@ func (d *Delegator) Perform(ctx context.Context) error {
 
 	switch selected := d.Selected.(type) {
 	case *Command:
-		err = selected.Setup(*d.Flags).Parse(d.positionalArgs[1:])
+		err = selected.Setup(*d.Flags).Parse(args[1:])
 	case *Delegator:
-		selected.positionalArgs = d.positionalArgs[1:]
+		err = selected.Flags.Parse(args[1:])
 	default:
 		err = fmt.Errorf("unsupported value of type %T", selected)
 	}
