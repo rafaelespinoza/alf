@@ -18,6 +18,8 @@ type Command struct {
 	// Run is a wrapper function that selects the necessary command line inputs,
 	// executes the command and returns any errors.
 	Run func(ctx context.Context) error
+
+	flags *flag.FlagSet
 }
 
 // Summary provides a short, one-line description.

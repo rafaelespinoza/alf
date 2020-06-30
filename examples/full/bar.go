@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/rafaelespinoza/alf"
 )
@@ -21,7 +20,7 @@ var Bar = func(cmdname string) alf.Directive {
 	// barArgs is named args for the "bar" command.
 	var barArgs struct {
 		Alpha   int
-		Biff    bool
+		Bravo   bool
 		Charlie string
 	}
 
@@ -30,7 +29,6 @@ var Bar = func(cmdname string) alf.Directive {
 	// define flags for this parent command.
 	parentFlags := flag.NewFlagSet(cmdname, flag.ExitOnError)
 	parentFlags.IntVar(&barArgs.Alpha, "alpha", 42, "a number")
-	parentFlags.BoolVar(&barArgs.Biff, "biff", false, "what are ya? chicken?")
 
 	// set up help text.
 	parentFlags.Usage = func() {
@@ -50,7 +48,7 @@ Subcommands:
 		fmt.Printf("\n\nFlags:\n\n")
 		parentFlags.PrintDefaults()
 	}
-	del.Flags = parentFlags // don't forget this.
+	del.Flags = parentFlags // share flag data from parent to child command.
 
 	// define subcommands here. The key is the subcommand name.
 	del.Subs = map[string]alf.Directive{
@@ -61,7 +59,8 @@ Subcommands:
 			Setup: func(inFlags flag.FlagSet) *flag.FlagSet {
 				name := cmdname + " cities"
 				inFlags.Init(name, flag.ExitOnError)
-				inFlags.StringVar(&barArgs.Charlie, "chuck", "", "an alternative charlie")
+				inFlags.BoolVar(&barArgs.Bravo, "bravo", false, "show a city with a B")
+				inFlags.StringVar(&barArgs.Charlie, "charlie", "parker", "customize charlie")
 
 				// help text for subcommand.
 				inFlags.Usage = func() {
@@ -81,8 +80,13 @@ Description:
 			// go. This is also a good place to do input validation.
 			Run: func(ctx context.Context) error {
 				var cities []string
-				if barArgs.Biff {
-					cities = []string{"Hill Valley, CA"}
+				if barArgs.Bravo {
+					cities = []string{
+						"Bonn, Germany",
+						"Balikpapan, Indonesia",
+						"Beni Mellal, Morocco",
+						"Bello, Colombia",
+					}
 				} else {
 					cities = []string{
 						"A Coruña, Spain",
@@ -91,9 +95,11 @@ Description:
 						"Avellaneda, Argentina",
 					}
 				}
-				ind := time.Now().Second() % len(cities)
-				fmt.Printf("city: %q\n", cities[ind])
-				fmt.Printf("your alternative charlie %q\n", barArgs.Charlie)
+				ind := barArgs.Alpha % len(cities)
+				fmt.Printf(
+					"city: %q, custom charlie: %q\n",
+					cities[ind], barArgs.Charlie,
+				)
 				return nil
 			},
 		},
@@ -102,7 +108,8 @@ Description:
 			Setup: func(inFlags flag.FlagSet) *flag.FlagSet {
 				name := cmdname + " oof"
 				inFlags.Init(name, flag.ExitOnError)
-				inFlags.StringVar(&barArgs.Charlie, "chaz", "", "an alternative charlie")
+				inFlags.BoolVar(&barArgs.Bravo, "bravo", false, "return an error if true")
+				inFlags.StringVar(&barArgs.Charlie, "chuck", "berry", "an alternative charlie")
 				inFlags.Usage = func() {
 					fmt.Fprintf(inFlags.Output(), `Usage:
 
@@ -110,17 +117,17 @@ Description:
 
 Description:
 
-	Return an error if Biff, otherwise be ok.`, _Bin, name)
+	Return an error if bravo is true, otherwise be ok.`, _Bin, name)
 					fmt.Printf("\n\nFlags:\n\n")
 					inFlags.PrintDefaults()
 				}
 				return &inFlags
 			},
 			Run: func(ctx context.Context) error {
-				if barArgs.Biff {
-					return fmt.Errorf("sample error, here's a number %d", barArgs.Alpha)
+				if barArgs.Bravo {
+					return fmt.Errorf("demo force show usage%w", alf.ErrShowUsage)
 				}
-				fmt.Printf("your alternative charlie %q\n", barArgs.Charlie)
+				fmt.Printf("your alternative charlie %q is %d years old", barArgs.Charlie, barArgs.Alpha)
 				return nil
 			},
 		},

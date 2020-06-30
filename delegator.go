@@ -51,7 +51,8 @@ func (d *Delegator) Perform(ctx context.Context) error {
 
 	switch selected := d.Selected.(type) {
 	case *Command:
-		err = selected.Setup(*d.Flags).Parse(args[1:])
+		selected.flags = selected.Setup(*d.Flags)
+		err = selected.flags.Parse(args[1:])
 	case *Delegator:
 		err = selected.Flags.Parse(args[1:])
 	default:

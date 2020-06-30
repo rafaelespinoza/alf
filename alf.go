@@ -25,7 +25,11 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 		return err
 	}
 	if r.PrePerform != nil {
-		if err := r.PrePerform(ctx); err != nil {
+		err := r.PrePerform(ctx)
+		if errors.Is(err, ErrShowUsage) {
+			r.Flags.Usage()
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -41,8 +45,12 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if _, ok := directive.(*Command); ok {
-		return directive.Perform(ctx)
+	if cmd, ok := directive.(*Command); ok {
+		ierr := cmd.Perform(ctx)
+		if errors.Is(ierr, ErrShowUsage) {
+			cmd.flags.Usage()
+		}
+		return ierr
 	}
 
 	delegator := directive.(*Delegator)
@@ -58,6 +66,9 @@ func (r *Root) Run(ctx context.Context, args []string) error {
 	} else {
 		err = subcmd.Perform(ctx)
 	}
+	if errors.Is(err, ErrShowUsage) {
+		subcmd.flags.Usage()
+	}
 	return err
 }
 
@@ -69,3 +80,9 @@ type Directive interface {
 	// Perform should either choose a subcommand or do a task.
 	Perform(ctx context.Context) error
 }
+
+// ErrShowUsage should be returned or wrapped when you want to show the
+// command's help menu (run its Usage func) even though the user did not
+// specifically request it. It has no text so it doesn't mess up your error
+// message if you're use error wrapping.
+var ErrShowUsage = errors.New("")

@@ -14,6 +14,8 @@ var fooArgs struct {
 	Echo  string
 }
 
+const maxDelta = 42
+
 // Foo is a subcommand of the root command. Direct children of the root don't
 // need to delegate to child commands. They could also be commands themselves.
 var Foo alf.Directive = &alf.Command{
@@ -30,13 +32,21 @@ var Foo alf.Directive = &alf.Command{
 
 Description:
 
-	Example, repeat a string.`, _Bin)
+	Example, repeat a string. Must be <= %d`, _Bin, maxDelta)
 			fmt.Printf("\n\nFlags:\n\n")
 			flags.PrintDefaults()
 		}
 		return flags
 	},
 	Run: func(ctx context.Context) error {
+		// The Run function is a good place to perform input validation. This
+		// example shows the help menu on invalid data.
+		if fooArgs.Delta > maxDelta {
+			return fmt.Errorf(
+				"delta %d must be <= %d %w",
+				fooArgs.Delta, maxDelta, alf.ErrShowUsage,
+			)
+		}
 		for i := 0; i < fooArgs.Delta; i++ {
 			fmt.Println(fooArgs.Echo)
 		}
