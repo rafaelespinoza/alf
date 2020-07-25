@@ -1,0 +1,26 @@
+name: build
+on: [push, pull_request]
+env:
+  GO111MODULE: on
+jobs:
+  all:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+    - name: Checkout repo
+      uses: actions/checkout@v1
+    - name: Get dependencies
+      run: |
+        go mod download
+        go mod verify
+    - name: Build source
+      run: go build .
+    - name: Test source
+      run: go test -v .
+    - name: Build examples
+      run: |
+        mkdir bin
+        go build -o bin/full_example ./examples/full
