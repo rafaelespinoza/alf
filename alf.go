@@ -7,6 +7,7 @@ package alf
 import (
 	"context"
 	"errors"
+	"flag"
 )
 
 // Root is your main, top-level command.
@@ -20,56 +21,22 @@ type Root struct {
 
 // Run parses the top-level flags, extracts the positional arguments and
 // executes the command. Invoke this from main with args as os.Args[1:].
-func (r *Root) Run(ctx context.Context, args []string) error {
-	if err := r.Flags.Parse(args); err != nil {
-		return err
+func (r *Root) Run(ctx context.Context, args []string) (err error) {
+	if err = r.Flags.Parse(args); err != nil {
+		return
 	}
 	if r.PrePerform != nil {
-		err := r.PrePerform(ctx)
+		err = r.PrePerform(ctx)
 		if errors.Is(err, ErrShowUsage) {
 			r.Flags.Usage()
 		}
 		if err != nil {
-			return err
+			return
 		}
 	}
-	var directive Directive
-	err := r.Perform(ctx)
-	if r.Selected == nil {
-		// either asked for help or asked for unknown command.
-		r.Flags.Usage()
-	} else {
-		directive = r.Selected
-	}
-	if err != nil {
-		return err
-	}
 
-	if cmd, ok := directive.(*Command); ok {
-		ierr := cmd.Perform(ctx)
-		if errors.Is(ierr, ErrShowUsage) {
-			cmd.flags.Usage()
-		}
-		return ierr
-	}
-
-	delegator := directive.(*Delegator)
-	if err = delegator.Perform(ctx); err != nil {
-		delegator.Flags.Usage()
-		return err
-	}
-
-	subcmd, ok := delegator.Selected.(*Command)
-	if !ok {
-		// yeah, let's try not to create too deep of a command hierarchy.
-		err = errors.New("one does not simply create too many layers of delegators")
-	} else {
-		err = subcmd.Perform(ctx)
-	}
-	if errors.Is(err, ErrShowUsage) {
-		subcmd.flags.Usage()
-	}
-	return err
+	err = r.Perform(ctx)
+	return
 }
 
 // Directive is an abstraction for a parent or child command. A parent would
@@ -86,3 +53,17 @@ type Directive interface {
 // specifically request it. It has no text so it doesn't mess up your error
 // message if you're use error wrapping.
 var ErrShowUsage = errors.New("")
+
+func maybeCallUsage(err error, flags *flag.FlagSet) {
+	if err == nil {
+		return
+	}
+	for _, target := range []error{ErrShowUsage, flag.ErrHelp, errUnknownCommand} {
+		if errors.Is(err, target) {
+			flags.Usage()
+			return
+		}
+	}
+}
+
+var errUnknownCommand = errors.New("unknown command")

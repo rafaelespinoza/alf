@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -132,6 +133,56 @@ Description:
 			},
 		},
 	}
+
+	// This demonstrates a subcommand that is both:
+	// - a child of a parent command
+	// - and a parent of some child commands
+	nested := alf.Delegator{
+		Description: "a subcommand (with its own commands) of a subcommand",
+		Subs: map[string]alf.Directive{
+			"alfa": &alf.Command{
+				Description: "terminal command of a nested subcommand",
+				Setup: func(inFlags flag.FlagSet) *flag.FlagSet {
+					inFlags.Init("nested alfa", flag.ContinueOnError)
+					inFlags.Usage = func() { fmt.Println("help for nested.alfa") }
+					return &inFlags
+				},
+				Run: func(ctx context.Context) error {
+					fmt.Println("called bar.moar.alfa")
+					return nil
+				},
+			},
+			"bravo": &alf.Command{
+				Description: "terminal command of a nested subcommand, (returns error)",
+				Setup: func(inFlags flag.FlagSet) *flag.FlagSet {
+					inFlags.Init("nested bravo", flag.ContinueOnError)
+					inFlags.Usage = func() { fmt.Println("help for nested.bravo") }
+					return &inFlags
+				},
+				Run: func(ctx context.Context) error {
+					fmt.Println("called bar.moar.bravo")
+					return errors.New("demo error")
+				},
+			},
+		},
+	}
+	nested.Flags = flag.NewFlagSet("nested", flag.ContinueOnError)
+	nested.Flags.Usage = func() {
+		fmt.Fprintf(nested.Flags.Output(), `Usage:
+
+	%s [flags]
+
+Description:
+
+	Demo of nested Delegator (subcommand has a parent and its own subcommands).
+
+Subcommands:
+
+	%v`, _Bin, strings.Join(nested.DescribeSubcommands(), "\n\t"))
+		fmt.Printf("\n\nFlags:\n\n")
+		nested.Flags.PrintDefaults()
+	}
+	del.Subs["nested"] = &nested
 
 	return del
 }("bar")

@@ -17,10 +17,8 @@ type Delegator struct {
 	Flags *flag.FlagSet
 	// Selected is the chosen transfer point of control.
 	Selected Directive
-	// Subs associates a name with another Directive. It's probably best to not
-	// create too deep of a hierarchy of Delegators pointing to Delegators. An
-	// exception to this recommendation is a Root command with some Delegators
-	// as direct childen, which in turn have just one more level of subcommands.
+	// Subs associates a name with another Directive. The name is what to
+	// specify from the command line.
 	Subs map[string]Directive
 }
 
@@ -31,7 +29,9 @@ func (d *Delegator) Summary() string { return d.Description }
 func (d *Delegator) Perform(ctx context.Context) error {
 	args := d.Flags.Args()
 	if len(args) < 1 {
-		return flag.ErrHelp
+		err := flag.ErrHelp
+		maybeCallUsage(err, d.Flags)
+		return err
 	}
 
 	var err error
@@ -40,21 +40,33 @@ func (d *Delegator) Perform(ctx context.Context) error {
 		err = flag.ErrHelp
 	default:
 		if cmd, ok := d.Subs[first]; !ok {
-			err = fmt.Errorf("unknown command %q", first)
+			err = fmt.Errorf("%w %q", errUnknownCommand, first)
 		} else {
 			d.Selected = cmd
 		}
 	}
 	if err != nil {
+		maybeCallUsage(err, d.Flags)
 		return err
 	}
 
 	switch selected := d.Selected.(type) {
 	case *Command:
 		selected.flags = selected.Setup(*d.Flags)
-		err = selected.flags.Parse(args[1:])
+		if err = selected.flags.Parse(args[1:]); err != nil {
+			return err
+		}
+		err = selected.Perform(ctx)
+		maybeCallUsage(err, selected.flags)
 	case *Delegator:
-		err = selected.Flags.Parse(args[1:])
+		f := selected.Flags
+		if f == nil {
+			return fmt.Errorf("selected Delegator %q requires Flags", args[0])
+		}
+		if err = f.Parse(args[1:]); err != nil {
+			return err
+		}
+		err = selected.Perform(ctx)
 	default:
 		err = fmt.Errorf("unsupported value of type %T", selected)
 	}

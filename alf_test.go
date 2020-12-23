@@ -26,6 +26,32 @@ func newStubRoot(name string, usage *string) alf.Root {
 		}
 	}
 
+	india := alf.Delegator{
+		Description: "subcmd of a subcmd with more subs",
+		Flags:       newMutedFlagSet("india", flag.ContinueOnError),
+		Subs: map[string]alf.Directive{
+			"foo": &alf.Command{
+				Description: "works OK",
+				Setup: func(p flag.FlagSet) *flag.FlagSet {
+					f := newMutedFlagSet("delta india foo", flag.ContinueOnError)
+					f.Usage = func() { firstUsage("root.delta.india.foo") }
+					return f
+				},
+				Run: func(ctx context.Context) error { return nil },
+			},
+			"bar": &alf.Command{
+				Description: "has an error",
+				Setup: func(p flag.FlagSet) *flag.FlagSet {
+					f := newMutedFlagSet("delta india bar", flag.ContinueOnError)
+					f.Usage = func() { firstUsage("root.delta.india.bar") }
+					return f
+				},
+				Run: func(ctx context.Context) error { return errStub },
+			},
+		},
+	}
+	india.Flags.Usage = func() { firstUsage("root.delta.india") }
+
 	delta := alf.Delegator{
 		Description: "subcmd with more subs",
 		Flags:       newMutedFlagSet("delta", flag.ContinueOnError),
@@ -66,6 +92,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				},
 				Run: func(ctx context.Context) error { return alf.ErrShowUsage },
 			},
+			"india": &india,
 		},
 	}
 	delta.Flags.IntVar(&bar, "bar", 2, "bbb")
@@ -136,27 +163,33 @@ func TestRoot(t *testing.T) {
 		// Returns whatever the Command returns.
 		{args: []string{"alpha"}, expErr: false},
 		{args: []string{"bravo"}, expErr: true},
-		// Help on Command
+		// Calls correct Usage function (Command).
 		{args: []string{"charlie"}, expErr: true, expUsage: "root.charlie"},
 		// Works with flag values on Root's FlagSet.
 		{args: []string{"-foo", "fff", "alpha"}, expErr: false},
 		// Parent flags should be specified before the subcommand.
 		{args: []string{"alpha", "-foo", "fff"}, expErr: true, expUsage: "root.alpha"},
-		// Help on a Delegator.
+		// Calls correct Usage function (Delegator).
 		{args: []string{"delta"}, expErr: true, expUsage: "root.delta"},
 		{args: []string{"delta", "-h"}, expErr: true, expUsage: "root.delta"},
 		// Access Delegator -> Command.
 		{args: []string{"delta", "echo"}, expErr: false},
 		{args: []string{"delta", "foxtrot"}, expErr: false},
 		{args: []string{"delta", "golf"}, expErr: false},
-		// Help on Delegator -> Command.
+		// Calls correct Usage function (Delegator -> Command).
 		{args: []string{"delta", "echo", "-h"}, expErr: true, expUsage: "root.delta.echo"},
 		{args: []string{"delta", "foxtrot", "-h"}, expErr: true, expUsage: "root.delta.foxtrot"},
 		{args: []string{"delta", "golf", "-h"}, expErr: true, expUsage: "root.delta"},
 		{args: []string{"delta", "hotel"}, expErr: true, expUsage: "root.delta.hotel"},
+		// Access Delegator -> Delegator -> Command.
+		{args: []string{"delta", "india", "foo"}, expErr: false},
+		{args: []string{"delta", "india", "bar"}, expErr: true},
+		// Calls correct Usage function (Delegator -> Delegator -> Command).
+		{args: []string{"delta", "india", "foo", "-h"}, expErr: true, expUsage: "root.delta.india.foo"},
+		{args: []string{"delta", "india", "bar", "-h"}, expErr: true, expUsage: "root.delta.india.bar"},
 		// Unknown command.
 		{args: []string{"echo"}, expErr: true, expUsage: "root"},
-		{args: []string{"delta", "india"}, expErr: true, expUsage: "root.delta"},
+		{args: []string{"delta", "zulu"}, expErr: true, expUsage: "root.delta"},
 		// Optional PrePerform field.
 		{
 			args: []string{"alpha"},
@@ -302,15 +335,24 @@ func TestDelegator(t *testing.T) {
 }
 
 func TestCommand(t *testing.T) {
-	root := newStubRoot(t.Name(), nil)
+	var usage string
+	root := newStubRoot(t.Name(), &usage)
 
-	alpha := root.Subs["alpha"].Perform(context.TODO())
-	if alpha != nil {
-		t.Errorf("should return result of Run; got %v, expected %v", alpha, nil)
+	got := root.Subs["alpha"].Perform(context.TODO())
+	if got != nil {
+		t.Errorf("should return result of Run; got %v, expected %v", got, nil)
 	}
 
-	bravo := root.Subs["bravo"].Perform(context.TODO())
-	if bravo != errStub {
-		t.Errorf("should return result of Run; got %v, expected %v", bravo, errStub)
+	got = root.Subs["bravo"].Perform(context.TODO())
+	if got != errStub {
+		t.Errorf("should return result of Run; got %v, expected %v", got, errStub)
+	}
+
+	// simulate traversing down the tree to a known Command.
+	deleg := root.Subs["delta"].(*alf.Delegator)
+	nestedDeleg := deleg.Subs["india"].(*alf.Delegator)
+	got = nestedDeleg.Subs["bar"].Perform(context.TODO())
+	if got != errStub {
+		t.Errorf("should return result of Run; got %v, expected %v", got, errStub)
 	}
 }
