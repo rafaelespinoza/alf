@@ -55,10 +55,13 @@ Subcommands:
 
 Examples:
 
-	%s [subcommand] -h`,
+	%s [subcommand] -h
+
+Flags:
+
+`,
 			_Bin, _Bin, pkg, strings.Join(Root.DescribeSubcommands(), "\n\t"), _Bin)
 
-		fmt.Printf("\n\nFlags:\n\n")
 		del.Flags.PrintDefaults()
 	}
 

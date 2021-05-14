@@ -32,8 +32,12 @@ var Foo alf.Directive = &alf.Command{
 
 Description:
 
-	Example, repeat a string. Must be <= %d`, _Bin, maxDelta)
-			fmt.Printf("\n\nFlags:\n\n")
+	Example, repeat a string. Must be <= %d
+
+Flags:
+
+`,
+				name, maxDelta)
 			flags.PrintDefaults()
 		}
 		return flags
