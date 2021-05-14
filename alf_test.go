@@ -14,15 +14,22 @@ import (
 
 var errStub = errors.New("oof")
 
-func newStubRoot(name string, usage *string) alf.Root {
+func newStubRoot(name string, usage *string, timesUsageCalled *int) alf.Root {
 	var (
 		foo string
 		bar int
 		qux bool
 	)
-	firstUsage := func(val string) {
+
+	// onUsage captures invocations of a Usage function. It helps with checking
+	// the correct Usage func is called, and that any Usage function is called
+	// just once.
+	onUsage := func(val string) {
 		if usage == nil || *usage == "" {
 			*usage = val
+		}
+		if timesUsageCalled != nil {
+			*timesUsageCalled++
 		}
 	}
 
@@ -34,7 +41,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "works OK",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("delta india foo", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.delta.india.foo") }
+					f.Usage = func() { onUsage("root.delta.india.foo") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return nil },
@@ -43,14 +50,14 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "has an error",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("delta india bar", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.delta.india.bar") }
+					f.Usage = func() { onUsage("root.delta.india.bar") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return errStub },
 			},
 		},
 	}
-	india.Flags.Usage = func() { firstUsage("root.delta.india") }
+	india.Flags.Usage = func() { onUsage("root.delta.india") }
 
 	delta := alf.Delegator{
 		Description: "subcmd with more subs",
@@ -61,7 +68,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					p.Init("delta echo", flag.ContinueOnError)
 					p.BoolVar(&qux, "quebec", true, "qqq")
-					p.Usage = func() { firstUsage("root.delta.echo") }
+					p.Usage = func() { onUsage("root.delta.echo") }
 					return &p
 				},
 				Run: func(ctx context.Context) error { return nil },
@@ -70,7 +77,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "ignore input flags",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("delta foxtrot", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.delta.foxtrot") }
+					f.Usage = func() { onUsage("root.delta.foxtrot") }
 					f.BoolVar(&qux, "qux", false, "QQQ")
 					return f
 				},
@@ -87,7 +94,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "force show help directive command",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("delta hotel", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.delta.hotel") }
+					f.Usage = func() { onUsage("root.delta.hotel") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return alf.ErrShowUsage },
@@ -96,7 +103,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 		},
 	}
 	delta.Flags.IntVar(&bar, "bar", 2, "bbb")
-	delta.Flags.Usage = func() { firstUsage("root.delta") }
+	delta.Flags.Usage = func() { onUsage("root.delta") }
 
 	root := alf.Delegator{
 		Description: "root",
@@ -106,7 +113,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "ok command",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("alpha", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.alpha") }
+					f.Usage = func() { onUsage("root.alpha") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return nil },
@@ -115,7 +122,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "error command",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("bravo", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.bravo") }
+					f.Usage = func() { onUsage("root.bravo") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return errStub },
@@ -124,7 +131,7 @@ func newStubRoot(name string, usage *string) alf.Root {
 				Description: "force show help command",
 				Setup: func(p flag.FlagSet) *flag.FlagSet {
 					f := newMutedFlagSet("charlie", flag.ContinueOnError)
-					f.Usage = func() { firstUsage("root.charlie") }
+					f.Usage = func() { onUsage("root.charlie") }
 					return f
 				},
 				Run: func(ctx context.Context) error { return alf.ErrShowUsage },
@@ -132,8 +139,8 @@ func newStubRoot(name string, usage *string) alf.Root {
 			"delta": &delta,
 		},
 	}
-	root.Flags.StringVar(&foo, "foo", "golf", "fff")
-	root.Flags.Usage = func() { firstUsage("root") }
+	root.Flags.StringVar(&foo, "foo", "frank", "root flag example")
+	root.Flags.Usage = func() { onUsage("root") }
 
 	return alf.Root{Delegator: &root}
 }
@@ -149,49 +156,98 @@ func newMutedFlagSet(name string, exit flag.ErrorHandling) *flag.FlagSet {
 
 func TestRoot(t *testing.T) {
 	var prePerformTest string
-	tests := []struct {
+	type testCase struct {
 		args          []string
 		prePerform    func(context.Context) error
 		expPrePerform string
 		expErr        bool
 		expUsage      string
-	}{
-		// Help
-		{args: []string{""}, expErr: true, expUsage: "root"},
-		{args: []string{"-h"}, expErr: true, expUsage: "root"},
-		{args: []string{"--help"}, expErr: true, expUsage: "root"},
-		// Returns whatever the Command returns.
-		{args: []string{"alpha"}, expErr: false},
-		{args: []string{"bravo"}, expErr: true},
-		// Calls correct Usage function (Command).
-		{args: []string{"charlie"}, expErr: true, expUsage: "root.charlie"},
-		// Works with flag values on Root's FlagSet.
-		{args: []string{"-foo", "fff", "alpha"}, expErr: false},
-		// Parent flags should be specified before the subcommand.
-		{args: []string{"alpha", "-foo", "fff"}, expErr: true, expUsage: "root.alpha"},
-		// Calls correct Usage function (Delegator).
-		{args: []string{"delta"}, expErr: true, expUsage: "root.delta"},
-		{args: []string{"delta", "-h"}, expErr: true, expUsage: "root.delta"},
-		// Access Delegator -> Command.
-		{args: []string{"delta", "echo"}, expErr: false},
-		{args: []string{"delta", "foxtrot"}, expErr: false},
-		{args: []string{"delta", "golf"}, expErr: false},
-		// Calls correct Usage function (Delegator -> Command).
-		{args: []string{"delta", "echo", "-h"}, expErr: true, expUsage: "root.delta.echo"},
-		{args: []string{"delta", "foxtrot", "-h"}, expErr: true, expUsage: "root.delta.foxtrot"},
-		{args: []string{"delta", "golf", "-h"}, expErr: true, expUsage: "root.delta"},
-		{args: []string{"delta", "hotel"}, expErr: true, expUsage: "root.delta.hotel"},
-		// Access Delegator -> Delegator -> Command.
-		{args: []string{"delta", "india", "foo"}, expErr: false},
-		{args: []string{"delta", "india", "bar"}, expErr: true},
-		// Calls correct Usage function (Delegator -> Delegator -> Command).
-		{args: []string{"delta", "india", "foo", "-h"}, expErr: true, expUsage: "root.delta.india.foo"},
-		{args: []string{"delta", "india", "bar", "-h"}, expErr: true, expUsage: "root.delta.india.bar"},
-		// Unknown command.
-		{args: []string{"echo"}, expErr: true, expUsage: "root"},
-		{args: []string{"delta", "zulu"}, expErr: true, expUsage: "root.delta"},
-		// Optional PrePerform field.
-		{
+	}
+
+	runTest := func(t *testing.T, test testCase) {
+		t.Helper()
+
+		prePerformTest = ""
+		var usage string
+		var usageCalls int
+		root := newStubRoot(t.Name(), &usage, &usageCalls)
+		if test.prePerform != nil {
+			root.PrePerform = test.prePerform
+		}
+
+		err := root.Run(context.TODO(), test.args)
+		if err == nil && test.expErr {
+			t.Error("expected error, got none")
+		} else if err != nil && !test.expErr {
+			t.Errorf("unexpected error; %v", err)
+		}
+
+		if prePerformTest != test.expPrePerform {
+			t.Errorf(
+				"prePerformCheck incorrect; got %q, expected %q",
+				prePerformTest, test.expPrePerform,
+			)
+		}
+
+		if usage != test.expUsage {
+			t.Errorf(
+				"wrong Usage func; got %q, expected %q; input args: %v",
+				usage, test.expUsage, test.args,
+			)
+		}
+
+		if usageCalls > 1 {
+			t.Errorf("called Usage %d times; expected <= 1", usageCalls)
+		}
+	}
+
+	t.Run("Returns whatever the Command returns", func(t *testing.T) {
+		runTest(t, testCase{args: []string{"alpha"}, expErr: false})
+		runTest(t, testCase{args: []string{"bravo"}, expErr: true})
+	})
+
+	t.Run("Calls correct Usage function", func(t *testing.T) {
+		// Root
+		runTest(t, testCase{args: []string{""}, expErr: true, expUsage: "root"})
+		runTest(t, testCase{args: []string{"-h"}, expErr: true, expUsage: "root"})
+		runTest(t, testCase{args: []string{"--help"}, expErr: true, expUsage: "root"})
+
+		// Command
+		runTest(t, testCase{args: []string{"charlie"}, expErr: true, expUsage: "root.charlie"})
+
+		// Delegator
+		runTest(t, testCase{args: []string{"delta"}, expErr: true, expUsage: "root.delta"})
+		runTest(t, testCase{args: []string{"delta", "-h"}, expErr: true, expUsage: "root.delta"})
+
+		// Delegator -> Command
+		runTest(t, testCase{args: []string{"delta", "echo", "-h"}, expErr: true, expUsage: "root.delta.echo"})
+		runTest(t, testCase{args: []string{"delta", "foxtrot", "-h"}, expErr: true, expUsage: "root.delta.foxtrot"})
+		runTest(t, testCase{args: []string{"delta", "golf", "-h"}, expErr: true, expUsage: "root.delta"})
+		runTest(t, testCase{args: []string{"delta", "hotel"}, expErr: true, expUsage: "root.delta.hotel"})
+
+		// Delegator -> Delegator
+		runTest(t, testCase{args: []string{"delta", "india"}, expErr: true, expUsage: "root.delta.india"})
+
+		// Delegator -> Delegator -> Command
+		runTest(t, testCase{args: []string{"delta", "india", "foo", "-h"}, expErr: true, expUsage: "root.delta.india.foo"})
+		runTest(t, testCase{args: []string{"delta", "india", "bar", "-h"}, expErr: true, expUsage: "root.delta.india.bar"})
+	})
+
+	t.Run("Parent flags", func(t *testing.T) {
+		// These test really just document where parent command flags are
+		// supposed to be specified.
+
+		// A root command's flag should be before the subcommand name.
+		runTest(t, testCase{args: []string{"-foo", "fred", "alpha"}, expErr: false})
+
+		// But if the root command flag is specified after the subcommand name,
+		// then it's interpreted as a subcommand flag. This example results in
+		// an error because the subcommand doesn't define this flag.
+		runTest(t, testCase{args: []string{"alpha", "-foo", "fff"}, expErr: true, expUsage: "root.alpha"})
+	})
+
+	t.Run("PrePerform", func(t *testing.T) {
+		runTest(t, testCase{
 			args: []string{"alpha"},
 			prePerform: func(ctx context.Context) error {
 				prePerformTest = "alpha prePerformCheck"
@@ -199,66 +255,60 @@ func TestRoot(t *testing.T) {
 			},
 			expErr:        false,
 			expPrePerform: "alpha prePerformCheck",
-		},
-		// This args sequence would normally not have an error.
-		{
+		})
+
+		// When an error occurs in PrePerform
+		runTest(t, testCase{
 			args:       []string{"delta", "foxtrot"},
 			prePerform: func(ctx context.Context) error { return errStub },
 			expErr:     true,
-		},
-		{
-			args:       []string{"delta", "foxtrot"},
-			prePerform: func(ctx context.Context) error { return alf.ErrShowUsage },
-			expErr:     true,
-			expUsage:   "root",
-		},
-		{
+		})
+
+		runTest(t, testCase{
 			args: []string{"delta", "foxtrot"},
 			prePerform: func(ctx context.Context) error {
 				return fmt.Errorf("%w, wrap", alf.ErrShowUsage)
 			},
 			expErr:   true,
 			expUsage: "root",
-		},
-		// Shouldn't get in the way of parent flags.
-		{
-			args:       []string{"-foo", "fff", "alpha"},
-			prePerform: func(ctx context.Context) error { return nil },
-			expErr:     false,
-		},
-	}
+		})
+	})
 
-	for i, test := range tests {
-		prePerformTest = ""
-		var usage string
-		root := newStubRoot(fmt.Sprintf("%s %d", t.Name(), i), &usage)
-		if test.prePerform != nil {
-			root.PrePerform = test.prePerform
-		}
-
-		err := root.Run(context.TODO(), test.args)
-		if err == nil && test.expErr {
-			t.Errorf("test %d; expected error, got none", i)
-		} else if err != nil && !test.expErr {
-			t.Errorf("test %d; unexpected error; %v", i, err)
-		}
-		if prePerformTest != test.expPrePerform {
-			t.Errorf(
-				"test %d; prePerformCheck incorrect; got %q, expected %q",
-				i, prePerformTest, test.expPrePerform,
-			)
-		}
-		if usage != test.expUsage {
-			t.Errorf("test %d; got %q, expected %q", i, usage, test.expUsage)
-			t.Log(test.args)
-		}
-	}
+	t.Run("Unknown command", func(t *testing.T) {
+		runTest(t, testCase{args: []string{"echo"}, expErr: true, expUsage: "root"})
+		runTest(t, testCase{args: []string{"delta", "zulu"}, expErr: true, expUsage: "root.delta"})
+	})
 }
 
 func TestDelegator(t *testing.T) {
 	t.Run("DescribeSubcommands", func(t *testing.T) {
-		root := newStubRoot(t.Name(), nil)
-		out := root.Delegator.DescribeSubcommands()
+		root := alf.Delegator{
+			Description: "root",
+			Flags:       newMutedFlagSet("root", flag.ContinueOnError),
+			Subs: map[string]alf.Directive{
+				"alpha": &alf.Command{
+					Description: "a",
+					Setup:       func(p flag.FlagSet) *flag.FlagSet { return &p },
+					Run:         func(ctx context.Context) error { return nil },
+				},
+				"bravo": &alf.Command{
+					Description: "b",
+					Setup:       func(p flag.FlagSet) *flag.FlagSet { return &p },
+					Run:         func(ctx context.Context) error { return nil },
+				},
+				"charlie": &alf.Command{
+					Description: "c",
+					Setup:       func(p flag.FlagSet) *flag.FlagSet { return &p },
+					Run:         func(ctx context.Context) error { return nil },
+				},
+				"delta": &alf.Command{
+					Description: "d",
+					Setup:       func(p flag.FlagSet) *flag.FlagSet { return &p },
+					Run:         func(ctx context.Context) error { return nil },
+				},
+			},
+		}
+		out := root.DescribeSubcommands()
 
 		expectedMentions := []string{"alpha", "bravo", "charlie", "delta"}
 		if len(out) != len(expectedMentions) {
@@ -274,69 +324,135 @@ func TestDelegator(t *testing.T) {
 		}
 	})
 
-	t.Run("flags", func(t *testing.T) {
-		tests := []struct {
-			args              []string
+	// Tests that a Delegator with Subs can pass flags from a parent to child in
+	// various ways.
+	t.Run("sharing flag data", func(t *testing.T) {
+		type testCase struct {
+			delegator         alf.Delegator
+			subcmdName        string
 			expectedFlagNames []string
-		}{
-			{
-				args:              []string{"delta", "echo"},
-				expectedFlagNames: []string{"bar", "quebec"},
-			},
-			{
-				args:              []string{"delta", "foxtrot"},
-				expectedFlagNames: []string{"qux"},
-			},
-			{
-				args:              []string{"delta", "golf"},
-				expectedFlagNames: []string{"bar"},
-			},
 		}
-		for i, test := range tests {
-			root := newStubRoot(t.Name(), nil)
-			delta, ok := root.Subs["delta"].(*alf.Delegator)
-			if !ok {
-				t.Fatalf(
-					"test %d; delta to be a %T",
-					i, &alf.Delegator{},
-				)
-			}
-			subDelta, ok := delta.Subs[test.args[1]].(*alf.Command)
-			if !ok {
-				t.Fatalf(
-					"test %d; expected delta subcommand to be a %T",
-					i, &alf.Command{},
-				)
-			}
 
+		runTest := func(t *testing.T, test testCase) {
+			t.Helper()
+
+			subcmd := test.delegator.Subs[test.subcmdName].(*alf.Command)
 			childFlagNames := make([]string, 0)
 			// Mimics one part of (*Delegator).Perform. Kind of hacky, but no
 			// other way to access a Command's flags from here.
-			subDelta.Setup(*delta.Flags).VisitAll(
+			subcmd.Setup(*test.delegator.Flags).VisitAll(
 				func(f *flag.Flag) { childFlagNames = append(childFlagNames, f.Name) },
 			)
 
 			if len(childFlagNames) != len(test.expectedFlagNames) {
 				t.Errorf(
-					"test %d; wrong number of child flags; got %d, expected %d",
-					i, len(childFlagNames), len(test.expectedFlagNames),
+					"wrong number of child flags; got %d, expected %d",
+					len(childFlagNames), len(test.expectedFlagNames),
 				)
 			}
-			for j, name := range childFlagNames {
-				if name != test.expectedFlagNames[j] {
+			for i, name := range childFlagNames {
+				if name != test.expectedFlagNames[i] {
 					t.Errorf(
-						"test %d %d; wrong name; got %q, expected %q",
-						i, j, name, test.expectedFlagNames[j],
+						"flag[%d]; wrong name; got %q, expected %q",
+						i, name, test.expectedFlagNames[i],
 					)
 				}
 			}
 		}
+
+		makeTestDelegator := func() alf.Delegator {
+			root := alf.Delegator{
+				Description: "root",
+				Flags:       newMutedFlagSet("root", flag.ContinueOnError),
+			}
+			var (
+				bar int
+				qux bool
+			)
+			root.Flags.IntVar(&bar, "bar", 2, "bbb")
+
+			root.Subs = map[string]alf.Directive{
+				"alpha": &alf.Command{
+					Description: "decorate (mutate) the input flags",
+					Setup: func(p flag.FlagSet) *flag.FlagSet {
+						p.Init("a", flag.ContinueOnError)
+						p.BoolVar(&qux, "quebec", true, "qqq")
+						return &p
+					},
+					Run: func(ctx context.Context) error { return nil },
+				},
+				"bravo": &alf.Command{
+					Description: "ignore input flags",
+					Setup: func(p flag.FlagSet) *flag.FlagSet {
+						f := newMutedFlagSet("a", flag.ContinueOnError)
+						f.BoolVar(&qux, "qux", false, "QQQ")
+						return f
+					},
+					Run: func(ctx context.Context) error { return nil },
+				},
+				"charlie": &alf.Command{
+					Description: "allow input flags to pass through",
+					Setup: func(p flag.FlagSet) *flag.FlagSet {
+						return &p
+					},
+					Run: func(ctx context.Context) error { return nil },
+				},
+			}
+			return root
+		}
+
+		t.Run("decorate parent flags", func(t *testing.T) {
+			// uses the parent flags and adds its own flags.
+			runTest(t, testCase{
+				delegator:         makeTestDelegator(),
+				subcmdName:        "alpha",
+				expectedFlagNames: []string{"bar", "quebec"},
+			})
+		})
+
+		t.Run("ignore parent flags", func(t *testing.T) {
+			// only considers its own flags.
+			runTest(t, testCase{
+				delegator:         makeTestDelegator(),
+				subcmdName:        "bravo",
+				expectedFlagNames: []string{"qux"},
+			})
+		})
+
+		t.Run("pass-through parent flags", func(t *testing.T) {
+			// doesn't need to add its own flags, can just use parent flags.
+			runTest(t, testCase{
+				delegator:         makeTestDelegator(),
+				subcmdName:        "charlie",
+				expectedFlagNames: []string{"bar"},
+			})
+		})
 	})
 }
 
 func TestCommand(t *testing.T) {
-	var usage string
-	root := newStubRoot(t.Name(), &usage)
+	root := alf.Delegator{
+		Description: "root",
+		Flags:       newMutedFlagSet("root", flag.ContinueOnError),
+		Subs: map[string]alf.Directive{
+			"alpha": &alf.Command{
+				Description: "ok command",
+				Setup: func(p flag.FlagSet) *flag.FlagSet {
+					f := newMutedFlagSet("alpha", flag.ContinueOnError)
+					return f
+				},
+				Run: func(ctx context.Context) error { return nil },
+			},
+			"bravo": &alf.Command{
+				Description: "error command",
+				Setup: func(p flag.FlagSet) *flag.FlagSet {
+					f := newMutedFlagSet("bravo", flag.ContinueOnError)
+					return f
+				},
+				Run: func(ctx context.Context) error { return errStub },
+			},
+		},
+	}
 
 	got := root.Subs["alpha"].Perform(context.TODO())
 	if got != nil {
@@ -344,14 +460,6 @@ func TestCommand(t *testing.T) {
 	}
 
 	got = root.Subs["bravo"].Perform(context.TODO())
-	if got != errStub {
-		t.Errorf("should return result of Run; got %v, expected %v", got, errStub)
-	}
-
-	// simulate traversing down the tree to a known Command.
-	deleg := root.Subs["delta"].(*alf.Delegator)
-	nestedDeleg := deleg.Subs["india"].(*alf.Delegator)
-	got = nestedDeleg.Subs["bar"].Perform(context.TODO())
 	if got != errStub {
 		t.Errorf("should return result of Run; got %v, expected %v", got, errStub)
 	}
