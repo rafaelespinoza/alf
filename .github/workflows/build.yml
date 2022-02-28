@@ -1,26 +1,44 @@
 name: build
 on: [push, pull_request]
-env:
-  GO111MODULE: on
 jobs:
-  all:
+  build:
     runs-on: ubuntu-latest
     steps:
-    - name: Setup go
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.13
     - name: Checkout repo
-      uses: actions/checkout@v1
-    - name: Get dependencies
-      run: |
-        go mod download
-        go mod verify
+      uses: actions/checkout@v2
+    - name: Setup go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - name: Check module dependencies
+      run: make mod
     - name: Build source
-      run: go build .
+      run: make build
     - name: Test source
-      run: go test -v .
-    - name: Build examples
+      run: make test ARGS="-v -coverprofile=/tmp/cover.out"
+    - name: Vet source
+      run: make vet
+    - name: Build, run examples
       run: |
-        mkdir bin
-        go build -o bin/full_example ./examples/full
+        make build-examples
+        ./bin/full_example || true
+    - name: Upload code coverage
+      uses: codecov/codecov-action@v2
+      with:
+        files: /tmp/cover.out
+
+  # The GitHub action, securego/gosec, doesn't seem to work properly when it's
+  # preceded by another action that supplies the env var, GOROOT. Example error:
+  #
+  #   loading files from package ".": err: exit status 2: stderr: go: cannot find GOROOT directory: /opt/hostedtoolcache/go/1.17.7/x64
+  #
+  # As a workaround, do this security scan separately.
+  security_scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run gosec
+      uses: securego/gosec@master
+      with:
+        args: ./...

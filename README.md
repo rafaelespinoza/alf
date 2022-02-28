@@ -8,6 +8,7 @@
 
 [![](https://github.com/rafaelespinoza/alf/workflows/build/badge.svg)](https://github.com/rafaelespinoza/alf/actions)
 [![](https://pkg.go.dev/badge/github.com/rafaelespinoza/alf)](https://pkg.go.dev/github.com/rafaelespinoza/alf)
+[![codecov](https://codecov.io/gh/rafaelespinoza/alf/branch/main/graph/badge.svg?token=DNTONIM3DT)](https://codecov.io/gh/rafaelespinoza/alf)
 
 `alf` is a simple toolset for making command line applications in golang. Some
 design goals include:
