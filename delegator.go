@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // A Delegator is a parent to a set of commands. Its sole purpose is to direct
@@ -15,8 +16,6 @@ type Delegator struct {
 	Description string
 	// Flags collect and share inputs to its sub directives.
 	Flags *flag.FlagSet
-	// Selected is the chosen transfer point of control.
-	Selected Directive
 	// Subs associates a name with another Directive. The name is what to
 	// specify from the command line.
 	Subs map[string]Directive
@@ -34,15 +33,22 @@ func (d *Delegator) Perform(ctx context.Context) error {
 		return err
 	}
 
-	var err error
-	switch first := args[0]; first {
+	var (
+		name     string
+		err      error
+		selected Directive
+	)
+	switch name = args[0]; name {
 	case "-h", "-help", "--help", "help":
 		err = flag.ErrHelp
 	default:
-		if cmd, ok := d.Subs[first]; !ok {
-			err = fmt.Errorf("%w %q", errUnknownCommand, first)
+		cmd, found := d.chooseSubcommand(name)
+		if !found {
+			err = fmt.Errorf("%w %q", errUnknownCommand, name)
+		} else if cmd == nil {
+			err = fmt.Errorf("subcommand %q is empty", name)
 		} else {
-			d.Selected = cmd
+			selected = cmd
 		}
 	}
 	if err != nil {
@@ -50,8 +56,11 @@ func (d *Delegator) Perform(ctx context.Context) error {
 		return err
 	}
 
-	switch selected := d.Selected.(type) {
+	switch selected := selected.(type) {
 	case *Command:
+		if selected.Setup == nil {
+			return fmt.Errorf("subcommand %q Setup is empty", name)
+		}
 		selected.flags = selected.Setup(*d.Flags)
 		if err = selected.flags.Parse(args[1:]); err != nil {
 			return err
@@ -71,6 +80,26 @@ func (d *Delegator) Perform(ctx context.Context) error {
 		err = fmt.Errorf("unsupported value of type %T", selected)
 	}
 	return err
+}
+
+func (d *Delegator) chooseSubcommand(name string) (out Directive, found bool) {
+	out, found = d.Subs[name]
+	if found {
+		return
+	}
+	if name == "" {
+		return
+	}
+
+	for fullname, directive := range d.Subs {
+		if strings.HasPrefix(fullname, name) {
+			out = directive
+			found = true
+			return
+		}
+	}
+
+	return
 }
 
 // DescribeSubcommands outputs summaries of each subcommand ordered by name.
