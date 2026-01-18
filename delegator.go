@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"text/tabwriter"
 )
 
 // A Delegator is a parent to a set of commands. Its sole purpose is to direct
@@ -104,12 +105,20 @@ func (d *Delegator) chooseSubcommand(name string) (out Directive, found bool) {
 
 // DescribeSubcommands outputs summaries of each subcommand ordered by name.
 func (d *Delegator) DescribeSubcommands() []string {
-	descriptions := make([]string, 0)
+	var buf strings.Builder
+	tw := tabwriter.NewWriter(&buf, 2, 8, 2, '\t', 0)
 	for name, subcmd := range d.Subs {
-		descriptions = append(
-			descriptions,
-			fmt.Sprintf("%-20s\t%-40s", name, subcmd.Summary()),
-		)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\n", name, subcmd.Summary())
+	}
+	_ = tw.Flush()
+
+	descriptions := strings.Split(buf.String(), "\n")
+
+	// Before sorting, check if the last line is blank.
+	// Do this because of the way the lines are processed: each command + summary
+	// gets its own line, including the very last one.
+	if n := len(descriptions); n > 0 && descriptions[n-1] == "" {
+		descriptions = descriptions[:n-1]
 	}
 	sort.Strings(descriptions)
 	return descriptions
