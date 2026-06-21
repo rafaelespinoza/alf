@@ -2,39 +2,44 @@
 
 GO := "go"
 GOSEC := "gosec"
-PKG_IMPORT_PATH := "github.com/rafaelespinoza/alf"
+PKG_PATH := "./..."
 
 # list recipes
+[default]
 @default:
     just -f {{ justfile() }} --list --unsorted
 
 # sanity check for compilation errors
+[group('build')]
 build:
-	{{ GO }} build {{ PKG_IMPORT_PATH }}
+    {{ GO }} build {{ PKG_PATH }}
 
 # compile example
+[group('build')]
 build-examples:
-	mkdir -pv bin && {{ GO }} build -o ./bin/full_example ./examples/full
+    mkdir -pv bin && {{ GO }} build -o ./bin/full_example ./examples/full
 
 # get module dependencies, tidy them up
-mod:
+[group('build')]
+mod-tidy:
     {{ GO }} mod tidy
 
 # run tests (override variable value ARGS to use test flags)
-test ARGS='':
-    {{ GO }} test {{ PKG_IMPORT_PATH }}/... {{ ARGS }}
+[group('test')]
+test *args:
+    {{ GO }} test {{ PKG_PATH }} {{ args }}
 
 # examine source code for suspicious constructs
-vet ARGS='':
-    {{ GO }} vet {{ ARGS }} {{ PKG_IMPORT_PATH }}/...
+[group('static-analysis')]
+vet *args:
+    {{ GO }} vet {{ args }} {{ PKG_PATH }}
 
-# Run a security scanner over the source code. This justfile won't install the
-# scanner binary for you, so check out the gosec README for instructions:
-# https://github.com/securego/gosec
-#
-# If necessary, specify the path to the built binary with the GOSEC env var.
-#
-# Also note, the package paths (last positional input to gosec command) should
-# be a "relative" package path. That is, starting with a dot.
-gosec ARGS='':
-	{{ GOSEC }} {{ ARGS }} ./...
+[doc("Run a security scanner over the source code. This justfile won't install
+the binary for you, so check out the gosec README for instructions:
+    https://github.com/securego/gosec
+If necessary, specify the path to the binary with the GOSEC variable.
+    $ just GOSEC=path/to/gosec gosec
+    $ just --set GOSEC path/to/gosec gosec")]
+[group('static-analysis')]
+gosec *args:
+    {{ GOSEC }} {{ args }} {{ PKG_PATH }}
