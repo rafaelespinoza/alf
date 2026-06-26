@@ -216,7 +216,7 @@ func TestRoot(t *testing.T) {
 		runTest(t, testCase{args: []string{"charlie"}, expErr: true, expUsage: "root.charlie"})
 
 		// Delegator
-		runTest(t, testCase{args: []string{"delta"}, expErr: true, expUsage: "root.delta"})
+		runTest(t, testCase{args: []string{"delta"}, expErr: false, expUsage: "root.delta"})
 		runTest(t, testCase{args: []string{"delta", "-h"}, expErr: true, expUsage: "root.delta"})
 
 		// Delegator -> Command
@@ -226,7 +226,7 @@ func TestRoot(t *testing.T) {
 		runTest(t, testCase{args: []string{"delta", "hotel"}, expErr: true, expUsage: "root.delta.hotel"})
 
 		// Delegator -> Delegator
-		runTest(t, testCase{args: []string{"delta", "india"}, expErr: true, expUsage: "root.delta.india"})
+		runTest(t, testCase{args: []string{"delta", "india"}, expErr: false, expUsage: "root.delta.india"})
 
 		// Delegator -> Delegator -> Command
 		runTest(t, testCase{args: []string{"delta", "india", "foo", "-h"}, expErr: true, expUsage: "root.delta.india.foo"})

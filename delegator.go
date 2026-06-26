@@ -31,23 +31,23 @@ func (d *Delegator) Perform(ctx context.Context) error {
 	if len(args) < 1 {
 		err := flag.ErrHelp
 		maybeCallUsage(err, d.Flags)
-		return err
+		return nil
 	}
 
 	var err error
 	switch first := args[0]; first {
 	case "-h", "-help", "--help", "help":
 		err = flag.ErrHelp
+		maybeCallUsage(err, d.Flags)
+		return nil
 	default:
 		if cmd, ok := d.Subs[first]; !ok {
 			err = fmt.Errorf("%w %q", errUnknownCommand, first)
+			maybeCallUsage(err, d.Flags)
+			return err
 		} else {
 			d.Selected = cmd
 		}
-	}
-	if err != nil {
-		maybeCallUsage(err, d.Flags)
-		return err
 	}
 
 	switch selected := d.Selected.(type) {
