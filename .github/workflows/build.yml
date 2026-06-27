@@ -3,13 +3,15 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GOCOVERDIR: /tmp/alf_integration_test
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
       - name: Setup go
         uses: actions/setup-go@v6
         with:
-          go-version: 1.19
+          go-version: '1.20'
       - name: Install just
         uses: extractions/setup-just@v4
       - name: Check module dependencies
@@ -24,11 +26,16 @@ jobs:
         run: |
           just build-examples
           ./bin/full_example || true
+      - name: Run integration tests
+        run: |
+          # Bind mount this directory for capturing test coverage.
+          [[ ! -d "${GOCOVERDIR}" ]] && (mkdir -pv "${GOCOVERDIR}" || true)
+          just build-test-image run-test-container -v "${GOCOVERDIR}":/tmp/alf_integration_test
       - name: Upload code coverage
         uses: codecov/codecov-action@v6
         with:
           fail_ci_if_error: true
-          files: /tmp/cover.out
+          files: /tmp/cover.out,/tmp/alf_integration_test/integration_test_coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # The GitHub action, securego/gosec, doesn't seem to work properly when it's

@@ -4,6 +4,9 @@ GO := "go"
 GOSEC := "gosec"
 PKG_PATH := "./..."
 
+[private]
+_BIN_DIR := 'bin'
+
 # list recipes
 [default]
 @default:
@@ -16,8 +19,11 @@ build:
 
 # compile example
 [group('build')]
-build-examples:
-    mkdir -pv bin && {{ GO }} build -o ./bin/full_example ./examples/full
+build-examples: _mk_bin_dir
+    {{ GO }} build -o {{ _BIN_DIR }}/alf-example ./examples/full
+
+@_mk_bin_dir:
+    mkdir -pv {{ _BIN_DIR }}
 
 # get module dependencies, tidy them up
 [group('build')]
@@ -28,6 +34,10 @@ mod-tidy:
 [group('test')]
 test *args:
     {{ GO }} test {{ PKG_PATH }} {{ args }}
+
+[group('test')]
+build-integration-testbin: _mk_bin_dir
+    {{ GO }} build -o {{ _BIN_DIR }}/alf-example.test -cover ./examples/full
 
 # examine source code for suspicious constructs
 [group('static-analysis')]
@@ -43,3 +53,18 @@ If necessary, specify the path to the binary with the GOSEC variable.
 [group('static-analysis')]
 gosec *args:
     {{ GOSEC }} {{ args }} {{ PKG_PATH }}
+
+CONTAINER_TOOL := 'podman'
+TEST_CONTAINER_NAME := 'localhost/alf_test'
+
+# make container image for integration testing
+[group('test')]
+[group('container')]
+build-test-image:
+    {{ CONTAINER_TOOL }} image build -t {{ TEST_CONTAINER_NAME }} -f integration_tests/Containerfile .
+
+# run integration tests in a container
+[group('test')]
+[group('container')]
+run-test-container *run_flags:
+    {{ CONTAINER_TOOL }} run {{ run_flags }} {{ TEST_CONTAINER_NAME }}

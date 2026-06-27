@@ -1,0 +1,18 @@
+FROM golang:alpine AS builder
+
+# Set TERM env var and install ncurses so that the --pretty output
+# formatter may be used.
+ENV GOCOVERDIR="/tmp/alf_integration_test" TERM=xterm
+
+WORKDIR /src
+RUN apk add --no-cache bats just ncurses && \
+  mkdir -pv "${GOCOVERDIR}"
+
+COPY go.mod .
+RUN go mod tidy
+
+COPY . .
+RUN just build-integration-testbin && \
+  mv -v /src/bin/alf-example.test /usr/local/bin
+
+ENTRYPOINT ["bats", "--pretty", "/src/integration_tests/run_tests.sh"]
